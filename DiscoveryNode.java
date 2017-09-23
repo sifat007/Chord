@@ -98,6 +98,11 @@ class DiscoveryNodeThread implements Runnable {
 						}
 					}					
 				}
+				//Tell the peer that it is safe to terminate now (graceful termination)
+				Socket sock = new Socket(peerDesc.host, peerDesc.port);
+				ChordUtils.writeStringToSocket(sock, "#TERMINATE#");
+				sock.close();
+				
 			}
 
 		} catch (ClassNotFoundException | IOException e) {

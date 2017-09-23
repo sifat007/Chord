@@ -11,13 +11,14 @@ public class Peer extends Thread{
     ExecutorService threadPool = Executors.newFixedThreadPool(10);
     boolean RUNNING = true;
     FingerTable fingerTable;
+    PeerDescriptor predecessor;
     int peerID;
     int port;
     String nickname;
     String hostname;
     
-    String DISCOVERY_HOSTNAME;
-    int DISCOVERY_PORT;
+    static String DISCOVERY_HOSTNAME;
+    static int DISCOVERY_PORT;
 
     //Usage: java Peer <port> [id] [nickname]
 	public static void main(String[] args) {
@@ -44,12 +45,31 @@ public class Peer extends Thread{
 				
 		Peer p = new Peer(id,port,nickname);
 		p.register();
+		//Create a thread that can in close the Peer gracefully
+		(new Thread() {
+			@Override
+			public void run() {
+				Scanner scan = new Scanner(System.in);
+				while(scan.hasNext()) {
+					String str = scan.next();
+					if(str.equals("exit")) {				
+						try {
+							Socket sock = new Socket(DISCOVERY_HOSTNAME,DISCOVERY_PORT);
+							ChordUtils.writeStringToSocket(sock, "#REMOVE_PEER#");
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+		    			
+					}
+				}
+			}
+		}).start();
 		p.run();
 	}
 	
 	public Peer(int id,int port, String nickname) {
 		this.port = port;
-		this.peerID = id;		
+		this.peerID = id;
 		try {
 			this.hostname = InetAddress.getLocalHost().getHostName();
 		} catch (UnknownHostException e) {
@@ -92,20 +112,31 @@ public class Peer extends Thread{
     				PeerDescriptor randomPeer = (PeerDescriptor)ChordUtils.readObjectFromSocket(sock);
     				System.out.println(randomPeer);
     				if(randomPeer.id == this.peerID) {
-    					//Do nothing
-    				}else {  // Returned a new node
-    					
+    					//First peer
+    					this.predecessor = randomPeer;
+    				}else {  // Returned a new node; create finger table
+    					//PeerDescriptor successor = lookup(randomPeer);    					
     				}
     			}else if(message.equals("#COLLISION#")) {
-    				
+    				System.out.println("Peer ID Collision. Please enter a new ID(0-65536):");
+    				Scanner scan = new Scanner(System.in);
+    				String str = scan.next();
+    				int new_id;
+    				try {
+    					new_id = Integer.parseInt(str);
+    				}catch(NumberFormatException e) {
+    					System.out.print("Generating a random peer ID.");
+    					long time = new Date().getTime();
+    					new_id = ChordUtils.CRC16((time + "").getBytes());
+    				}
+    				this.peerID = new_id; 				
     			}
     			sock.close();
         	}
 			
 		} catch (IOException | ClassNotFoundException e) {
 			e.printStackTrace();
-		}
-        
+		}        
 	}
 	
 	@Override
@@ -114,7 +145,7 @@ public class Peer extends Thread{
             ServerSocket svsocket = new ServerSocket(this.port);   
             while(RUNNING){
                 Socket sock = svsocket.accept();
-                this.threadPool.execute(new PeerThread(sock));
+                this.threadPool.execute(new PeerThread(sock,this));
             }
             svsocket.close();
         }catch(Exception ex){
@@ -128,47 +159,26 @@ public class Peer extends Thread{
 
 class PeerThread implements Runnable {
 	Socket sock;
+	Peer peer;
 
-	public PeerThread(Socket sock) {
+	public PeerThread(Socket sock, Peer peer) {
 		this.sock = sock;
+		this.peer = peer;
 	}
 
 	public void run() {
 
 		try {
-			ObjectInputStream OIS = new ObjectInputStream(this.sock.getInputStream());
-			PeerDescriptor nodeDesc = (PeerDescriptor) OIS.readObject();
-			synchronized (PeerThread.class) {
-				boolean collision = false;
-				for (PeerDescriptor n : DiscoveryNode.peerList) {
-					if (n.id == nodeDesc.id) {
-						// TODO: ID Collision; request new ID
-						collision = true;
-					}
-				}
-				if (!collision) {
-					DiscoveryNode.peerList.add(nodeDesc);
-					// TODO: Return a random node from the list of nodes
-				}
+			String message = ChordUtils.readStringFromSocket(sock);
+			System.out.println(message);
+			if(message.equals("#TERMINATE#")) {
+				//TODO: update other finger tables
+				
 			}
-
-		} catch (ClassNotFoundException | IOException e) {
+		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		String message = null;
-		// String message = BR.readLine();
-		if (message.startsWith("#JOIN#")) {
-			// System.out.println("Server: Reporting to Collator " +
-			// DiscoveryNode.COLLATOR_HOST +":"+DiscoveryNode.COLLATOR_PORT);
-			// Socket sock1 = new
-			// Socket(DiscoveryNode.COLLATOR_HOST,DiscoveryNode.COLLATOR_PORT);
-			// PrintStream PS = new PrintStream(sock1.getOutputStream());
-			// PS.println("#SERVER_REPORT#"+DiscoveryNode.HOSTNAME
-			// +":"+DiscoveryNode.PORT_NO + ","+ DiscoveryNode.receivedMessages + "," +
-			// DiscoveryNode.receiveSummation);
-			// sock1.close();
-			return;
-		}
+		
 
 	}
 }
