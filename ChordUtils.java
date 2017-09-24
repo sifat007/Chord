@@ -110,4 +110,9 @@ public class ChordUtils {
 		ObjectOutputStream OOS = new ObjectOutputStream(sock.getOutputStream());
 		OOS.writeObject(obj);
 	}
+
+	public static boolean isInBetween(int prev, int k, int peerID) {
+		if( (prev <  k && k < peerID ) || !(peerID < k && k < prev) ) return true;
+		else return false;
+	}
 }

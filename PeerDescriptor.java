@@ -21,7 +21,7 @@ public class PeerDescriptor implements Serializable{
 	}
 	
 	public String toString() {
-		return "["+id +", "+host+", "+port+", "+nickname+"]";
+		return id +"\t|\t"+host+"\t|\t"+port+"\t|\t"+nickname;
 	}
 
 }
