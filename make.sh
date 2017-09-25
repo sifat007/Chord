@@ -1,2 +1,2 @@
-javac DiscoveryNode.java
-javac Peer.java
+javac -g DiscoveryNode.java
+javac -g Peer.java

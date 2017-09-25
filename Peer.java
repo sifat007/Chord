@@ -8,8 +8,8 @@ import java.util.concurrent.Executors;
 
 public class Peer extends Thread{
 	
-    ExecutorService threadPool = Executors.newFixedThreadPool(10);
-    boolean RUNNING = true;
+    ExecutorService threadPool = Executors.newFixedThreadPool(20);
+    static boolean RUNNING = true;
     FingerTable fingerTable;
     PeerDescriptor predecessor;
     int peerID;
@@ -44,9 +44,9 @@ public class Peer extends Thread{
 		}
 				
 		Peer p = new Peer(id,port,nickname);
-		p.register();
-		//Create a thread that can in close the Peer gracefully
 		
+		p.register();
+		p.startOtherThreads();
 		p.start();
 	}
 	
@@ -63,12 +63,17 @@ public class Peer extends Thread{
 		}else {
 			this.nickname = hostname + ":" + this.port;
 		}
-		this.fingerTable = new FingerTable(this.peerID,this.hostname,this.port,this.nickname);
+		this.fingerTable = new FingerTable(this.peerID,this.hostname,this.port,this.nickname,this.peerID);
 	}
 	
+	public void startOtherThreads() {
+		new IOThread(this).start();
+		new HeartbeatThread(this).start();
+	}
+	
+	
 	public void register() {
-		//TODO: contact discovery node
-		// Read disovery node info from a file
+		// Read discovery node info from a file
         File f = new File("discovery_node.txt");
         Scanner scanner =null;
 		try {
@@ -99,27 +104,40 @@ public class Peer extends Thread{
     					this.predecessor = randomPeer;
     				}else {  // Returned a new node; create finger table
     					try {    						
-    						//fill up my finger table
-    						for(int i = 0 ; i < fingerTable.size(); i++) {
-    							Socket sock1 = new Socket(randomPeer.host, randomPeer.port);
-    							ChordUtils.writeStringToSocket(sock1, "#LOOKUP#");
-        						ChordUtils.writeStringToSocket(sock1, ""+(int)(this.peerID + Math.pow(2, i)));
-        						PeerDescriptor pd = (PeerDescriptor)ChordUtils.readObjectFromSocket(sock1);
-        						fingerTable.setPeerDescriptor(i, pd);
-    						}
+
     						//find my successor
     						Socket sock1 = new Socket(randomPeer.host, randomPeer.port);
     						ChordUtils.writeStringToSocket(sock1, "#LOOKUP#");
     						ChordUtils.writeStringToSocket(sock1, ""+this.peerID);
     						PeerDescriptor succ = (PeerDescriptor)ChordUtils.readObjectFromSocket(sock1);
+    						this.fingerTable.setPeerDescriptor(0, succ);
     						sock1.close();
     						//update predecessor of my successor
     						Socket sock2 = new Socket(succ.host, succ.port);
     						ChordUtils.writeStringToSocket(sock2, "#UPDATE_PRED#");
-    						// Previous predecessor of the successor becomes by predecessor
+    						// Previous predecessor of the successor becomes my predecessor
     						this.predecessor = (PeerDescriptor)ChordUtils.readObjectFromSocket(sock2);
     						ChordUtils.writeObjectToSocket(sock2, new PeerDescriptor(this.peerID,this.hostname,this.port,this.nickname));    						
     						sock2.close();
+    						// Update successor of my predecessor
+    						Socket sock3 = new Socket(this.predecessor.host,this.predecessor.port);
+    						ChordUtils.writeStringToSocket(sock3, "#UPDATE_SUCC#");
+    						ChordUtils.writeObjectToSocket(sock3, new PeerDescriptor(this.peerID,this.hostname,this.port,this.nickname));
+    						sock3.close();
+    						
+    						//fill up my finger table
+    						for(int i = 1 ; i < fingerTable.size(); i++) {
+    							Socket sock4 = new Socket(succ.host, succ.port);
+    							ChordUtils.writeStringToSocket(sock4, "#LOOKUP#");
+    							int curr = (int)(Math.pow(2, i));
+    							int max = (int)(Math.pow(2, 16));
+        						ChordUtils.writeStringToSocket(sock4, ""+ ((this.peerID + curr)%max));
+        						PeerDescriptor pd = (PeerDescriptor)ChordUtils.readObjectFromSocket(sock4);
+        						this.fingerTable.setPeerDescriptor(i, pd);
+    						}
+    						//TODO: Grab relevant files for my successor
+    						
+    						
     					} catch (IOException e) {
     						e.printStackTrace();
     					} 					
@@ -136,7 +154,7 @@ public class Peer extends Thread{
     					long time = new Date().getTime();
     					new_id = ChordUtils.CRC16((time + "").getBytes());
     				}
-    				this.peerID = new_id; 				
+    				this.peerID = new_id;     				
     			}
     			sock.close();
         	}
@@ -147,14 +165,26 @@ public class Peer extends Thread{
 	}
 	
 	
-	public PeerDescriptor lookup(int k) throws UnknownHostException, IOException {
-		if(ChordUtils.isInBetween(this.predecessor.id, k, this.peerID)) {
+	public PeerDescriptor lookup(int k) throws UnknownHostException, IOException  {
+		//System.out.println("ChorUtils.isInBetween(" +this.predecessor.id+ "," + k + ","+ this.peerID + ")" + " = "+ ChordUtils.isInBetween(this.predecessor.id, k, this.peerID));
+		if(ChordUtils.isInBetween(this.predecessor.id, k, this.peerID) || k == this.peerID) {
 			return new PeerDescriptor(this.peerID,this.hostname,this.port,this.nickname);
 		}
-		PeerDescriptor pd = this.fingerTable.nextHop(k, this.peerID);
-		Socket sock = new Socket(pd.host, pd.port);
+		PeerDescriptor pd = this.fingerTable.nextHop(k);
+		//System.out.println(pd);
+		Socket sock = null;
+		try {
+			sock = new Socket(pd.host, pd.port);
+		} catch (IOException e1) {			
+			e1.printStackTrace();
+		}
+		//fault-tolerance
+		if(sock == null) { // if the lookup fails; the peer may be down and finger-table is not yet updated; go to your successor
+			PeerDescriptor succ = this.fingerTable.get(0);
+			sock = new Socket(succ.host, succ.port);
+		}
 		ChordUtils.writeStringToSocket(sock, "#LOOKUP#");
-		ChordUtils.writeObjectToSocket(sock, this.peerID + "");
+		ChordUtils.writeObjectToSocket(sock, k + "");
 		try {
 			PeerDescriptor succ = (PeerDescriptor)ChordUtils.readObjectFromSocket(sock);
 			sock.close();
@@ -169,7 +199,7 @@ public class Peer extends Thread{
 	
 	@Override
 	public void run() {
-		new IOThread(this).start();
+		
 		try{
             ServerSocket svsocket = new ServerSocket(this.port);   
             while(RUNNING){
@@ -200,19 +230,23 @@ class PeerThread implements Runnable {
 
 		try {
 			String message = ChordUtils.readStringFromSocket(sock);
-			System.out.println(message);
-			if(message.equals("#TERMINATE#")) {
-				//TODO: update other finger tables				
-			}else if(message.equals("#LOOKUP#")) {
+			//System.out.println(message);
+			if(message.equals("#LOOKUP#")) {
 				String id = ChordUtils.readStringFromSocket(sock);
 				PeerDescriptor pd = peer.lookup(Integer.parseInt(id));
 				ChordUtils.writeObjectToSocket(sock, pd);
 			}else if(message.equals("#UPDATE_PRED#")) {
 				ChordUtils.writeObjectToSocket(sock, peer.predecessor);
-				PeerDescriptor pd = (PeerDescriptor)ChordUtils.readObjectFromSocket(sock);				
-				peer.predecessor = pd;
-				//send relevant files to pd
-				
+				PeerDescriptor pd = (PeerDescriptor)ChordUtils.readObjectFromSocket(sock);		
+				synchronized (PeerThread.class) {
+					peer.predecessor = pd;
+				}				
+				//send relevant files to pd				
+			}else if(message.equals("#UPDATE_SUCC#")) {
+				PeerDescriptor pd = (PeerDescriptor)ChordUtils.readObjectFromSocket(sock);
+				synchronized (PeerThread.class) {
+					peer.fingerTable.setPeerDescriptor(0, pd);
+				}
 			}
 			sock.close();
 		} catch (IOException | ClassNotFoundException e) {
@@ -224,6 +258,38 @@ class PeerThread implements Runnable {
 }
 
 
+
+class HeartbeatThread extends Thread{
+	Peer peer;
+	public HeartbeatThread(Peer peer) {
+		this.peer = peer;
+	}
+	
+	@Override
+	public void run() {
+		while(Peer.RUNNING) {
+			System.out.println("Heartbeat");
+			for(int i = 1 ; i < peer.fingerTable.size(); i++) {
+				try {
+					int curr = (int)(Math.pow(2, i));
+					int max = (int)(Math.pow(2, 16));
+					PeerDescriptor pd = peer.lookup((peer.peerID + curr)%max);
+					synchronized (HeartbeatThread.class) {
+						peer.fingerTable.setPeerDescriptor(i, pd);
+					}
+				} catch (IOException e) {
+					e.printStackTrace();
+				}								
+			}
+			try {
+				Thread.sleep(10000);
+			} catch (InterruptedException e1) {
+				e1.printStackTrace();
+			}
+		}
+		
+	}
+}
 
 class IOThread extends Thread{
 	Peer peer;
@@ -239,14 +305,46 @@ class IOThread extends Thread{
 				try {
 					Socket sock = new Socket(peer.DISCOVERY_HOSTNAME,peer.DISCOVERY_PORT);
 					ChordUtils.writeStringToSocket(sock, "#REMOVE_PEER#");
+					ChordUtils.writeStringToSocket(sock, peer.peerID+"");
+					String message = ChordUtils.readStringFromSocket(sock);
+					System.out.println(message);
+					if(message.equals("#TERMINATE#")) {
+						//TODO: remove myself from the ring
+						//update predecessor of my successor
+						PeerDescriptor succ = peer.fingerTable.get(0);
+						Socket sock2 = new Socket(succ.host, succ.port);
+						ChordUtils.writeStringToSocket(sock2, "#UPDATE_PRED#");
+						ChordUtils.readObjectFromSocket(sock2); //read the previous predecessor; we are overwriting it.
+						// my predecessor becomes the predecessor of my successor
+						ChordUtils.writeObjectToSocket(sock2, peer.predecessor);    						
+						sock2.close();
+						// Update successor of my predecessor
+						Socket sock3 = new Socket(peer.predecessor.host,peer.predecessor.port);
+						ChordUtils.writeStringToSocket(sock3, "#UPDATE_SUCC#");
+						// my successor become the successor of my predecessor
+						ChordUtils.writeObjectToSocket(sock3, succ);
+						sock3.close();
+						//TODO: send all my files to my successor
+						Peer.RUNNING = false;
+						System.out.println(Peer.RUNNING);
+					}
 					sock.close();
-				} catch (IOException e) {
+				} catch (IOException | ClassNotFoundException e) {
 					e.printStackTrace();
 				}		    			
 			}
-			if(str.equals("print")) {
+			else if(str.equals("print")) {
 				System.out.println("Predecessor: " + peer.predecessor);
 				System.out.println(peer.fingerTable);				
+			}
+			else if(str.equals("lookup")) {
+				int i = scan.nextInt();
+				try {
+					System.out.println(peer.lookup(i));
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
 			}
 		}
 	}

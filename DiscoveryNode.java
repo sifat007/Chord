@@ -89,22 +89,21 @@ class DiscoveryNodeThread implements Runnable {
 					}
 				}
 			}else if(message.equals("#REMOVE_PEER#")) {
-				PeerDescriptor peerDesc = (PeerDescriptor) ChordUtils.readObjectFromSocket(sock);
+				int peerID =  Integer.parseInt(ChordUtils.readStringFromSocket(sock));
+				System.out.println(peerID);
 				synchronized (DiscoveryNodeThread.class) {
 					for(int i = 0; i < DiscoveryNode.peerList.size(); i++) {
-						if(DiscoveryNode.peerList.get(i).id == peerDesc.id) {
+						if(DiscoveryNode.peerList.get(i).id == peerID) {
 							DiscoveryNode.peerList.remove(i);
 							break;
 						}
 					}					
 				}
 				//Tell the peer that it is safe to terminate now (graceful termination)
-				Socket sock = new Socket(peerDesc.host, peerDesc.port);
-				ChordUtils.writeStringToSocket(sock, "#TERMINATE#");
-				sock.close();
-				
+				//Socket sock = new Socket(peerDesc.host, peerDesc.port);
+				ChordUtils.writeStringToSocket(sock, "#TERMINATE#");				
 			}
-
+			sock.close();
 		} catch (ClassNotFoundException | IOException e) {
 			e.printStackTrace();
 		}
