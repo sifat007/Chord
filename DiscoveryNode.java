@@ -63,7 +63,17 @@ class DiscoveryNodeThread implements Runnable {
 		try {
 			String message = ChordUtils.readStringFromSocket(sock);
 			System.out.println(message);
-			if (message.equals("#ADD_PEER#")) {
+			if(message.equals("#GET_RANDOM#")) {
+				int size = DiscoveryNode.peerList.size();
+				if(size > 0) {
+					ChordUtils.writeStringToSocket(sock, "#OK#");
+					ChordUtils.writeObjectToSocket(sock, DiscoveryNode.peerList.get(new Random().nextInt(size)));
+				}else {
+					ChordUtils.writeStringToSocket(sock, "#EMPTY#");
+				}
+				
+			}
+			else if (message.equals("#ADD_PEER#")) {
 				PeerDescriptor peerDesc = (PeerDescriptor) ChordUtils.readObjectFromSocket(sock);
 				System.out.println(peerDesc);
 				synchronized (DiscoveryNodeThread.class) {

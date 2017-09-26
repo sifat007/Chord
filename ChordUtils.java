@@ -110,6 +110,65 @@ public class ChordUtils {
 		ObjectOutputStream OOS = new ObjectOutputStream(sock.getOutputStream());
 		OOS.writeObject(obj);
 	}
+	
+	/**
+	 * Reads a file from socket, saves in the /tmp directory, returns the filename
+	 * @param sock
+	 * @return filename
+	 * @throws IOException
+	 * @throws ClassNotFoundException
+	 */
+	
+	public static String readFileFromSocket(Socket sock) throws IOException, ClassNotFoundException{
+		ObjectInputStream ois = new ObjectInputStream(sock.getInputStream());
+		String filename = (String)ois.readObject();
+		//filename = "somefile.jpg";
+		File file = new File("/tmp/"+filename);
+		FileOutputStream fos = new FileOutputStream(file);
+		BufferedOutputStream bos = new BufferedOutputStream(fos);
+		
+		int buff_size = 10000;
+		byte[] contents;
+		System.out.println("Here");
+		//System.out.println(ois.readLong());		
+		long filesize = ois.readLong();
+		System.out.println(filesize);
+		long iterations = filesize/buff_size + ((filesize%buff_size>0)?1:0);
+		System.out.println(iterations);
+		for(int i = 0 ; i < iterations; i++) {
+			contents = (byte[])ois.readObject();
+			bos.write(contents,0,contents.length);
+		}		
+		bos.flush();
+		bos.close();
+		return filename;
+	}
+	
+	public static void writeFileToSocket(Socket sock, String filePath) throws IOException{
+		File file = new File(filePath);
+		FileInputStream fis = new FileInputStream(file);
+		BufferedInputStream bis = new BufferedInputStream(fis);		
+		ObjectOutputStream oos = new ObjectOutputStream(sock.getOutputStream());
+		byte[] contents;
+		long fileLength = file.length();
+		long current = 0;
+		oos.writeObject(new String(file.getName()));
+		oos.writeLong(new Long(fileLength));
+		while(current!=fileLength) {
+			int size = 10000;
+			if(fileLength - current >= size) {
+				current += size;
+			}else { 
+                size = (int)(fileLength - current); 
+                current = fileLength;
+            } 
+            contents = new byte[size]; 
+            System.out.println(current + " "+ fileLength);
+            bis.read(contents, 0, size); 
+            oos.writeObject(contents);
+		}
+        bis.close();
+	}
 
 	public static boolean isInBetween(int prev, int k, int peerID) {
 		if(prev == peerID) return true;
@@ -117,4 +176,6 @@ public class ChordUtils {
 		else if( (prev > peerID) && (peerID > k || k > prev)) return true;
 		else return false;
 	}
+	
+
 }

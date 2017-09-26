@@ -3,26 +3,26 @@ public class FingerTable {
 	
 	private PeerDescriptor[] list = new PeerDescriptor[16];
 	int peerID;
-	public FingerTable(int id, String hostname, int post, String nickname, int peerID) {
-		this.peerID = peerID;
+	public FingerTable(int id, String hostname, int post, String nickname) {
+		this.peerID = id;
 		for(int i = 0 ; i < 16; i++) {
 			list[i] = new PeerDescriptor(id,hostname,post,nickname);			
 		}
 	}
 	
-	public int size() {
+	public synchronized int size() {
 		return list.length;				
 	}
 	
-	public PeerDescriptor get(int index) {
+	public synchronized PeerDescriptor get(int index) {
 		return list[index];
 	}
 	
-	public void setPeerDescriptor(int index, PeerDescriptor pDesc) {
+	public synchronized void setPeerDescriptor(int index, PeerDescriptor pDesc) {
 		this.list[index] = pDesc;
 	}
 	
-	public PeerDescriptor nextHop(int k) {
+	public synchronized PeerDescriptor nextHop(int k) {
 		//if(k < peerID) k += Math.pow(2, 16);
 		//if(peerID < k && k < list[0].id + ((list[0].id<peerID)?(int)Math.pow(2, 16):0)) {
 		//System.out.println("ChorUtils.isInBetween(" +peerID+ "," + k + ","+ list[0].id + ")" + " = "+ ChordUtils.isInBetween(peerID, k, list[0].id));
@@ -39,13 +39,13 @@ public class FingerTable {
 	}
 	
 	@Override
-	public String toString() {
+	public synchronized String toString() {
 		String  s= "Finger Table\n===================\n";
 		int i = 0;		
 		for(PeerDescriptor p:list) {
 			int curr = (int)(Math.pow(2, i));
 			int max = (int)(Math.pow(2, 16));
-			s+= ( (curr+peerID)%max ) + "|" + p + "\n";
+			s+= Integer.toHexString( (curr+peerID)%max ) + "|" + p + "\n";
 			i++;
 		}
 		s += "===================\n";
