@@ -39,7 +39,7 @@ public class Peer extends Thread {
 			nickname = null;
 		}
 		if (args.length > 1) {
-			id = Integer.parseInt(args[1], 16);
+			id = Integer.parseInt(args[1], 10);
 			if (id >= Math.pow(2, 16)) {
 				System.out.println("Specified ID is too large");
 				return;
@@ -86,6 +86,8 @@ public class Peer extends Thread {
 			DISCOVERY_HOSTNAME = str[0];
 			DISCOVERY_PORT = Integer.parseInt(str[1]);
 		}
+		
+		System.out.println(new PeerDescriptor(this.peerID, this.hostname, this.port, this.nickname));
 
 	}
 
@@ -109,7 +111,7 @@ public class Peer extends Thread {
 				if (message.equals("#OK#")) {
 					done = true;
 					PeerDescriptor randomPeer = (PeerDescriptor) ChordUtils.readObjectFromSocket(sock);
-					System.out.println(randomPeer);
+					//System.out.println(randomPeer);
 					if (randomPeer.id == this.peerID) {
 						// First peer
 						this.predecessor = randomPeer;
@@ -118,7 +120,9 @@ public class Peer extends Thread {
 							// find my successor
 							Socket sock1 = new Socket(randomPeer.host, randomPeer.port);
 							ChordUtils.writeStringToSocket(sock1, "#LOOKUP#");
-							ChordUtils.writeStringToSocket(sock1, "" + this.peerID);
+							ChordUtils.writeStringToSocket(sock1, "" + this.peerID); //key/id
+							ChordUtils.writeStringToSocket(sock1, "" + this.peerID); //fromID
+							ChordUtils.writeStringToSocket(sock1, true + "");   //isHeartbeat
 							PeerDescriptor succ = (PeerDescriptor) ChordUtils.readObjectFromSocket(sock1);
 							this.fingerTable.setPeerDescriptor(0, succ);
 							sock1.close();
@@ -136,12 +140,11 @@ public class Peer extends Thread {
 							ChordUtils.writeObjectToSocket(sock3,
 									new PeerDescriptor(this.peerID, this.hostname, this.port, this.nickname));
 							sock3.close();
-							System.out.println("here");
 							// fill up my finger table; initialization
 							for (int i = 1; i < fingerTable.size(); i++) {
 								int curr = (int) (Math.pow(2, i));
 								int max = (int) (Math.pow(2, 16));
-								PeerDescriptor pd = this.lookup((this.peerID + curr) % max);
+								PeerDescriptor pd = this.lookup((this.peerID + curr) % max, this.peerID, true);
 								synchronized (HeartbeatThread.class) {
 									this.fingerTable.setPeerDescriptor(i, pd);
 								}
@@ -177,14 +180,19 @@ public class Peer extends Thread {
 		}
 	}
 
-	public PeerDescriptor lookup(int k) throws UnknownHostException, IOException {
+	public PeerDescriptor lookup(int k,int fromID, boolean isHeartbeat) throws UnknownHostException, IOException {
 		// System.out.println("ChorUtils.isInBetween(" +this.predecessor.id+ "," + k +
 		// ","+ this.peerID + ")" + " = "+ ChordUtils.isInBetween(this.predecessor.id,
 		// k, this.peerID));
+		if(!isHeartbeat)System.out.println("lookup " + k);
+		if(!isHeartbeat)System.out.println("From ID: " + fromID);
 		if (ChordUtils.isInBetween(this.predecessor.id, k, this.peerID) || k == this.peerID) {
-			return new PeerDescriptor(this.peerID, this.hostname, this.port, this.nickname);
+			PeerDescriptor pd = new PeerDescriptor(this.peerID, this.hostname, this.port, this.nickname);
+			if(!isHeartbeat)System.out.println("Returning: " + pd);
+			return pd;
 		}
 		PeerDescriptor pd = this.fingerTable.nextHop(k);
+		if(!isHeartbeat)System.out.println("Next Hop: " + pd.id);
 		Socket sock = null;
 		try {
 			sock = new Socket(pd.host, pd.port);
@@ -197,10 +205,14 @@ public class Peer extends Thread {
 			PeerDescriptor succ = this.fingerTable.get(0);
 			sock = new Socket(succ.host, succ.port);
 		}
-		ChordUtils.writeStringToSocket(sock, "#LOOKUP#");
-		ChordUtils.writeObjectToSocket(sock, k + "");
+		ChordUtils.writeStringToSocket(sock, "#LOOKUP#");		
+		ChordUtils.writeObjectToSocket(sock, k + ""); //key/id
+		ChordUtils.writeStringToSocket(sock, this.peerID+""); //fromID
+		ChordUtils.writeStringToSocket(sock, isHeartbeat + ""); //isHeartbeat
 		try {
 			PeerDescriptor succ = (PeerDescriptor) ChordUtils.readObjectFromSocket(sock);
+			//int hopCount = Integer.parseInt(ChordUtils.readStringFromSocket(sock));
+			//String path = ChordUtils.readStringFromSocket(sock);
 			sock.close();
 			return succ;
 		} catch (ClassNotFoundException e) {
@@ -245,7 +257,10 @@ class PeerThread implements Runnable {
 			// System.out.println(message);
 			if (message.equals("#LOOKUP#")) {
 				String id = ChordUtils.readStringFromSocket(sock);
-				PeerDescriptor pd = peer.lookup(Integer.parseInt(id));
+				int fromID = Integer.parseInt(ChordUtils.readStringFromSocket(sock));
+				boolean isHeartbeat = Boolean.parseBoolean(ChordUtils.readStringFromSocket(sock));
+				PeerDescriptor pd = peer.lookup(Integer.parseInt(id), fromID ,isHeartbeat);
+				//ChordUtils.writeStringToSocket(sock, isHeartbeat+"");
 				ChordUtils.writeObjectToSocket(sock, pd);
 			} else if (message.equals("#UPDATE_PRED#")) {
 				ChordUtils.writeObjectToSocket(sock, peer.predecessor);
@@ -310,12 +325,12 @@ class HeartbeatThread extends Thread {
 	@Override
 	public void run() {
 		while (Peer.RUNNING) {
-			System.out.println("Heartbeat");
+			//System.out.println("Heartbeat");
 			for (int i = 1; i < peer.fingerTable.size(); i++) {
 				try {
 					int curr = (int) (Math.pow(2, i));
 					int max = (int) (Math.pow(2, 16));
-					PeerDescriptor pd = peer.lookup((peer.peerID + curr) % max);
+					PeerDescriptor pd = peer.lookup((peer.peerID + curr) % max,peer.peerID, true);
 					synchronized (HeartbeatThread.class) {
 						peer.fingerTable.setPeerDescriptor(i, pd);
 					}
@@ -390,16 +405,15 @@ class IOThread extends Thread {
 					e.printStackTrace();
 				}
 			} else if (str.equals("print")) {
-				System.out.println("Peer ID:" + Integer.toHexString(peer.peerID));
+				System.out.println("Peer ID: " + peer.peerID);
 				System.out.println("Predecessor: " + peer.predecessor);
 				System.out.println(peer.fingerTable);
 				System.out.println(peer.storage);
 			} else if (str.equals("lookup")) {
-				int i = scan.nextInt();
+				int i = Integer.parseInt(scan.next(),16);
 				try {
-					System.out.println(peer.lookup(i));
+					System.out.println(peer.lookup(i, peer.peerID,false));
 				} catch (IOException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 			}

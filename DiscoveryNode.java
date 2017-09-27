@@ -67,7 +67,9 @@ class DiscoveryNodeThread implements Runnable {
 				int size = DiscoveryNode.peerList.size();
 				if(size > 0) {
 					ChordUtils.writeStringToSocket(sock, "#OK#");
-					ChordUtils.writeObjectToSocket(sock, DiscoveryNode.peerList.get(new Random().nextInt(size)));
+					synchronized (DiscoveryNodeThread.class) {
+						ChordUtils.writeObjectToSocket(sock, DiscoveryNode.peerList.get(new Random().nextInt(size)));
+					}
 				}else {
 					ChordUtils.writeStringToSocket(sock, "#EMPTY#");
 				}
@@ -98,6 +100,7 @@ class DiscoveryNodeThread implements Runnable {
 						ChordUtils.writeStringToSocket(sock, "#COLLISION#");
 					}
 				}
+			
 			}else if(message.equals("#REMOVE_PEER#")) {
 				int peerID =  Integer.parseInt(ChordUtils.readStringFromSocket(sock));
 				System.out.println(peerID);

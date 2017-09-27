@@ -21,7 +21,7 @@ public class StoreData {
 			return;
 		}
     	if(args.length > 1) {
-    		key = Integer.parseInt(args[1],16);
+    		key = Integer.parseInt(args[1],10);
     		if(key >= Math.pow(2, 16)) {
 				System.out.println("Specified ID is too large");
 				return;
@@ -66,8 +66,10 @@ public class StoreData {
 				try {
 					PeerDescriptor randomPeer = (PeerDescriptor)ChordUtils.readObjectFromSocket(sock);
 					Socket sock1 = new Socket(randomPeer.host, randomPeer.port);
-					ChordUtils.writeStringToSocket(sock1, "#LOOKUP#");
-					ChordUtils.writeStringToSocket(sock1, ""+this.k);
+					ChordUtils.writeStringToSocket(sock1, "#LOOKUP#");					
+					ChordUtils.writeStringToSocket(sock1, ""+this.k); //id/key
+					ChordUtils.writeStringToSocket(sock1, ""+this.k); //fromID
+					ChordUtils.writeStringToSocket(sock1, false + "");//isHeartbeat
 					this.peer = (PeerDescriptor)ChordUtils.readObjectFromSocket(sock1);
 					sock1.close();
 					// Send data to peer

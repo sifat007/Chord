@@ -1,5 +1,5 @@
-k2 53254 a
-boston 53254 aa
-boise 53254 aaa
-albany 53254 fff
-denver 53254 f9
+k2 53254 10
+boston 53254 100
+boise 53254 1000
+albany 53254 9999
+denver 53254 50

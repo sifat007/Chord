@@ -42,7 +42,7 @@ public class Storage {
 		Set<Integer> keys = this.hashtable.keySet();
 		String  s= "Storage\n===================\n";
 		for(int k:keys) {
-			s += Integer.toHexString(k) + "\t|\t" + get(k) + "\n";
+			s += k + "\t|\t" + get(k) + "\n";
 		}
 		s += "===================\n";
 		return s;

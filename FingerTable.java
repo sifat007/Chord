@@ -41,11 +41,9 @@ public class FingerTable {
 	@Override
 	public synchronized String toString() {
 		String  s= "Finger Table\n===================\n";
-		int i = 0;		
+		int i = 1;		
 		for(PeerDescriptor p:list) {
-			int curr = (int)(Math.pow(2, i));
-			int max = (int)(Math.pow(2, 16));
-			s+= Integer.toHexString( (curr+peerID)%max ) + "|" + p + "\n";
+			s+= (i + "|" + p + "\n");
 			i++;
 		}
 		s += "===================\n";
