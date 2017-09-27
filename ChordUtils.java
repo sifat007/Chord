@@ -171,7 +171,7 @@ public class ChordUtils {
 	}
 
 	public static boolean isInBetween(int prev, int k, int peerID) {
-		if(prev == peerID) return true;
+		if(prev == peerID) return false;
 		else if( (prev < peerID) && (prev <  k && k < peerID )  ) return true;
 		else if( (prev > peerID) && (peerID > k || k > prev)) return true;
 		else return false;

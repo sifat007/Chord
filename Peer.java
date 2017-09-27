@@ -186,7 +186,7 @@ public class Peer extends Thread {
 		// k, this.peerID));
 		if(!isHeartbeat)System.out.println("lookup " + k);
 		if(!isHeartbeat)System.out.println("From ID: " + fromID);
-		if (ChordUtils.isInBetween(this.predecessor.id, k, this.peerID) || k == this.peerID) {
+		if (ChordUtils.isInBetween(this.predecessor.id, k, this.peerID) || k == this.peerID || this.predecessor.id == this.peerID) {
 			PeerDescriptor pd = new PeerDescriptor(this.peerID, this.hostname, this.port, this.nickname);
 			if(!isHeartbeat)System.out.println("Returning: " + pd);
 			return pd;
@@ -410,13 +410,18 @@ class IOThread extends Thread {
 				System.out.println(peer.fingerTable);
 				System.out.println(peer.storage);
 			} else if (str.equals("lookup")) {
-				int i = Integer.parseInt(scan.next(),16);
+				int i = Integer.parseInt(scan.next(),10);
 				try {
 					System.out.println(peer.lookup(i, peer.peerID,false));
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
+			}else if (str.equals("nextHop")) {
+				int i = Integer.parseInt(scan.next(),10);				
+				System.out.println(peer.fingerTable.nextHop1(i));
+				
 			}
+			
 		}
 	}
 }

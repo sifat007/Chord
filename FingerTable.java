@@ -26,11 +26,29 @@ public class FingerTable {
 		//if(k < peerID) k += Math.pow(2, 16);
 		//if(peerID < k && k < list[0].id + ((list[0].id<peerID)?(int)Math.pow(2, 16):0)) {
 		//System.out.println("ChorUtils.isInBetween(" +peerID+ "," + k + ","+ list[0].id + ")" + " = "+ ChordUtils.isInBetween(peerID, k, list[0].id));
-		if(ChordUtils.isInBetween(peerID, k, list[0].id)) {
+		if(ChordUtils.isInBetween(peerID, k, list[0].id) || peerID == list[0].id) {
 			return list[0];
 		}
 		for(int i = 0; i < list.length - 1; i++) {
 			//if(list[i].id + ((list[i].id<peerID)?(int)Math.pow(2, 16):0) <= k && k < list[i+1].id + ((list[i+1].id<peerID)?(int)Math.pow(2, 16):0)) {
+			//System.out.println(i + " | " + "ChorUtils.isInBetween(" +list[i].id+ "," + k + ","+ list[i+1].id + ")" + " = "+ ChordUtils.isInBetween(list[i].id, k, list[i+1].id));
+			if(list[i].id == k || ChordUtils.isInBetween(list[i].id, k, list[i+1].id)) {
+				return list[i];
+			}
+		}
+		return list[list.length - 1];
+	}
+	
+	public synchronized PeerDescriptor nextHop1(int k) {
+		//if(k < peerID) k += Math.pow(2, 16);
+		//if(peerID < k && k < list[0].id + ((list[0].id<peerID)?(int)Math.pow(2, 16):0)) {
+		System.out.println("ChorUtils.isInBetween(" +peerID+ "," + k + ","+ list[0].id + ")" + " = "+ ChordUtils.isInBetween(peerID, k, list[0].id));
+		if(ChordUtils.isInBetween(peerID, k, list[0].id) || peerID == list[0].id) {
+			return list[0];
+		}
+		for(int i = 0; i < list.length - 1; i++) {
+			//if(list[i].id + ((list[i].id<peerID)?(int)Math.pow(2, 16):0) <= k && k < list[i+1].id + ((list[i+1].id<peerID)?(int)Math.pow(2, 16):0)) {
+			System.out.println(i + " | " + "ChorUtils.isInBetween(" +list[i].id+ "," + k + ","+ list[i+1].id + ")" + " = "+ ChordUtils.isInBetween(list[i].id, k, list[i+1].id));
 			if(list[i].id == k || ChordUtils.isInBetween(list[i].id, k, list[i+1].id)) {
 				return list[i];
 			}
