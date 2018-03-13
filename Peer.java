@@ -6,23 +6,45 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 
+/**
+ * A Peer in the Peer-to-Peer network
+ * Usage: java Peer <port> [id] [nickname]
+ * 
+ * @author Tarequl Islam Sifat
+ *
+ */
 public class Peer extends Thread {
-
+	
+	//Specify a maximum number of threads to run at once.
 	ExecutorService threadPool = Executors.newFixedThreadPool(20);
 	static boolean RUNNING = true;
 	FingerTable fingerTable;
+	
+	// Every Peer must know about it's predecessor
 	PeerDescriptor predecessor;
+	
+	// Specific ID of the Peer
 	int peerID;
+	// Port number of the Peer
 	int port;
+	// Nickname of the Peer
 	String nickname;
+	// Hostname of the Peer
 	String hostname;
 
+	// Hostname of the Discovery Node
 	String DISCOVERY_HOSTNAME;
+	// Port number of the Discovery Node
 	int DISCOVERY_PORT;
-
+	
 	Storage storage;
 
-	// Usage: java Peer <port> [id] [nickname]
+
+	/**
+	 * Facilitates parsing the command line arguments and starts up the Peer according to the arguments
+	 * 
+	 * @param args
+	 */
 	public static void main(String[] args) {
 		int id = 0;
 		int port = 0;
@@ -57,6 +79,13 @@ public class Peer extends Thread {
 
 	}
 
+	/**
+	 * Constructor; Initialize the object and read information about the discovery node from a config file.
+	 * 
+	 * @param id ID of the Peer
+	 * @param port Port number of the Peer
+	 * @param nickname Nickname of the Peer
+	 */
 	public Peer(int id, int port, String nickname) {
 		this.port = port;
 		this.peerID = id;
@@ -91,11 +120,19 @@ public class Peer extends Thread {
 
 	}
 
+	/**
+	 * Helper function to launch some persistent threads
+	 */
 	public void startOtherThreads() {
 		new IOThread(this).start();
 		new HeartbeatThread(this).start();
 	}
 
+	
+	/**
+	 * Register the Peer in the DiscoveryNode; reconstruct the Finger Table; update the successor and the predecessor
+	 * In case of an ID collision; request a new ID from the user and try again.
+	 */
 	public void register() {
 
 		// Connect to the discovery node
@@ -111,7 +148,6 @@ public class Peer extends Thread {
 				if (message.equals("#OK#")) {
 					done = true;
 					PeerDescriptor randomPeer = (PeerDescriptor) ChordUtils.readObjectFromSocket(sock);
-					//System.out.println(randomPeer);
 					if (randomPeer.id == this.peerID) {
 						// First peer
 						this.predecessor = randomPeer;
@@ -149,7 +185,7 @@ public class Peer extends Thread {
 									this.fingerTable.setPeerDescriptor(i, pd);
 								}
 							}
-							// TODO: Request relevant files for my successor
+							// Request relevant files for my successor
 							Socket sock4 = new Socket(succ.host, succ.port);
 							ChordUtils.writeStringToSocket(sock4, "#SEND_FILES#");
 							sock4.close();
@@ -171,6 +207,7 @@ public class Peer extends Thread {
 						new_id = ChordUtils.CRC16((time + "").getBytes());
 					}
 					this.peerID = new_id;
+					scan.close();
 				}
 				sock.close();
 			}
@@ -180,10 +217,17 @@ public class Peer extends Thread {
 		}
 	}
 
+	/**
+	 * A recursive method to find the Peer responsible for the ID 'k'
+	 * 
+	 * @param k ID for which we search for the responsible Peer
+	 * @param fromID Used for recursion 
+	 * @param isHeartbeat
+	 * @return
+	 * @throws UnknownHostException
+	 * @throws IOException
+	 */
 	public PeerDescriptor lookup(int k,int fromID, boolean isHeartbeat) throws UnknownHostException, IOException {
-		// System.out.println("ChorUtils.isInBetween(" +this.predecessor.id+ "," + k +
-		// ","+ this.peerID + ")" + " = "+ ChordUtils.isInBetween(this.predecessor.id,
-		// k, this.peerID));
 		if(!isHeartbeat)System.out.println("lookup " + k);
 		if(!isHeartbeat)System.out.println("From ID: " + fromID);
 		if (ChordUtils.isInBetween(this.predecessor.id, k, this.peerID) || k == this.peerID || this.predecessor.id == this.peerID) {
@@ -223,9 +267,12 @@ public class Peer extends Thread {
 
 	}
 
+	/**
+	 * Peer accepts TCP connections
+	 * 
+	 */
 	@Override
 	public void run() {
-
 		try {
 			ServerSocket svsocket = new ServerSocket(this.port);
 			while (RUNNING) {
@@ -241,6 +288,12 @@ public class Peer extends Thread {
 	}
 }
 
+/**
+ * Used for lookup and sending and receiving files
+ * 
+ * @author Tarequl Islam Sifat
+ *
+ */
 class PeerThread implements Runnable {
 	Socket sock;
 	Peer peer;
@@ -280,13 +333,9 @@ class PeerThread implements Runnable {
 				synchronized (PeerThread.class) {
 					peer.storage.store(Integer.parseInt(id), filename);
 				}
-				// System.out.println(path);
 			} else if (message.equals("#SEND_FILES#")) {
 				// Send relevant files to predecessor
 				sendFilesToPredecessor();
-				
-				
-
 			}
 			sock.close();
 		} catch (IOException | ClassNotFoundException e) {
@@ -295,6 +344,12 @@ class PeerThread implements Runnable {
 
 	}
 
+	/**
+	 * Helper function to send relevant files to predecessor of current Peer upon request
+	 * 
+	 * @throws UnknownHostException
+	 * @throws IOException
+	 */
 	private synchronized void sendFilesToPredecessor() throws UnknownHostException, IOException {
 		Set<Integer> keys = peer.storage.getAllKeys();
 		ArrayList<Integer> d_list = new ArrayList<Integer>();
@@ -369,7 +424,6 @@ class IOThread extends Thread {
 					sock.close();
 					System.out.println(message);
 					if (message.equals("#TERMINATE#")) {
-						// TODO: remove myself from the ring
 						// update predecessor of my successor
 						PeerDescriptor succ = peer.fingerTable.get(0);
 						if (succ.id == peer.peerID) {
@@ -388,7 +442,7 @@ class IOThread extends Thread {
 						// my successor become the successor of my predecessor
 						ChordUtils.writeObjectToSocket(sock3, succ);
 						sock3.close();
-						// TODO: send all my files to my successor
+						// send all my files to my successor
 						Set<Integer> keys = peer.storage.getAllKeys();
 						for (int k : keys) {
 							Socket sock4 = new Socket(succ.host, succ.port);
@@ -418,7 +472,7 @@ class IOThread extends Thread {
 				}
 			}else if (str.equals("nextHop")) {
 				int i = Integer.parseInt(scan.next(),10);				
-				System.out.println(peer.fingerTable.nextHop1(i));
+				System.out.println(peer.fingerTable.nextHop(i));
 				
 			}
 			

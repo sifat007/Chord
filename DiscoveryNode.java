@@ -7,20 +7,27 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class DiscoveryNode extends Thread {
-
+	 
+	//ThreadPool defines the maximum number of threads that can run at once. 	 
 	ExecutorService threadPool = Executors.newFixedThreadPool(10);
-
 	static ArrayList<PeerDescriptor> peerList = new ArrayList<PeerDescriptor>();
-
-	boolean RUNNING = true;
-	
+	boolean RUNNING = true;	
 	int port;
-
+	
+	/**
+	 * Start the DiscoveryNode
+	 * 
+	 * @param args
+	 * @throws Exception
+	 */
 	public static void main(String[] args) throws Exception {		
 		DiscoveryNode s = new DiscoveryNode();
 		s.run();
 	}
 
+	/**
+	 * Constructor that reads the hostname and port from a config file
+	 */
 	public DiscoveryNode() {
 		// System.out.println("server");
 		File f = new File("discovery_node.txt");
@@ -36,6 +43,9 @@ public class DiscoveryNode extends Thread {
         }
 	}
 
+	/** 
+	 * Whenever a connection is established using socket create a DiscoveryNodeThread and put the thread into the thread execution pool.
+	 */
 	public void run() {
 		try {
 			ServerSocket svsocket = new ServerSocket(this.port);
@@ -54,12 +64,20 @@ public class DiscoveryNode extends Thread {
 class DiscoveryNodeThread implements Runnable {
 	Socket sock;
 
+	/**
+	 * Constructor
+	 * 
+	 * @param sock	A socket connection accepted by the server socket.
+	 */
 	public DiscoveryNodeThread(Socket sock) {
 		this.sock = sock;
 	}
 
+	
+	/**
+	 * Read a message indicating the action to be taken and take that action.
+	 */
 	public void run() {
-
 		try {
 			String message = ChordUtils.readStringFromSocket(sock);
 			System.out.println(message);

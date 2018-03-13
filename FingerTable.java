@@ -1,8 +1,24 @@
 
+/**
+ * Data structure for the Finger Table of a Peer
+ * 
+ * @author Tarequl Islam Sifat
+ *
+ */
 public class FingerTable {
 	
+	// Finger table will contain 16 peer descriptors
 	private PeerDescriptor[] list = new PeerDescriptor[16];
 	int peerID;
+	
+	/**
+	 * Constructor 
+	 * 
+	 * @param id Peer ID
+	 * @param hostname
+	 * @param post
+	 * @param nickname A nickname for the peer
+	 */
 	public FingerTable(int id, String hostname, int post, String nickname) {
 		this.peerID = id;
 		for(int i = 0 ; i < 16; i++) {
@@ -10,28 +26,44 @@ public class FingerTable {
 		}
 	}
 	
+	/**
+	 * Size of the Finger Table
+	 */
 	public synchronized int size() {
 		return list.length;				
 	}
 	
+	/**
+	 * Get a specific PeerDescriptor
+	 * 
+	 * @param index
+	 * @return
+	 */
 	public synchronized PeerDescriptor get(int index) {
 		return list[index];
 	}
 	
+	/**
+	 * Set a specific PeerDescriptor
+	 * 
+	 * @param index
+	 * @param pDesc
+	 */
 	public synchronized void setPeerDescriptor(int index, PeerDescriptor pDesc) {
 		this.list[index] = pDesc;
 	}
 	
+	/**
+	 * Calculate the next hop to eventually reach a hop in the network that is responsible for the ID 'k'
+	 * 
+	 * @param k The ID for which are looking for the responsible Peer in the network
+	 * @return
+	 */
 	public synchronized PeerDescriptor nextHop(int k) {
-		//if(k < peerID) k += Math.pow(2, 16);
-		//if(peerID < k && k < list[0].id + ((list[0].id<peerID)?(int)Math.pow(2, 16):0)) {
-		//System.out.println("ChorUtils.isInBetween(" +peerID+ "," + k + ","+ list[0].id + ")" + " = "+ ChordUtils.isInBetween(peerID, k, list[0].id));
 		if(ChordUtils.isInBetween(peerID, k, list[0].id) || peerID == list[0].id) {
 			return list[0];
 		}
 		for(int i = 0; i < list.length - 1; i++) {
-			//if(list[i].id + ((list[i].id<peerID)?(int)Math.pow(2, 16):0) <= k && k < list[i+1].id + ((list[i+1].id<peerID)?(int)Math.pow(2, 16):0)) {
-			//System.out.println(i + " | " + "ChorUtils.isInBetween(" +list[i].id+ "," + k + ","+ list[i+1].id + ")" + " = "+ ChordUtils.isInBetween(list[i].id, k, list[i+1].id));
 			if(list[i].id == k || ChordUtils.isInBetween(list[i].id, k, list[i+1].id)) {
 				return list[i];
 			}
@@ -39,23 +71,9 @@ public class FingerTable {
 		return list[list.length - 1];
 	}
 	
-	public synchronized PeerDescriptor nextHop1(int k) {
-		//if(k < peerID) k += Math.pow(2, 16);
-		//if(peerID < k && k < list[0].id + ((list[0].id<peerID)?(int)Math.pow(2, 16):0)) {
-		System.out.println("ChorUtils.isInBetween(" +peerID+ "," + k + ","+ list[0].id + ")" + " = "+ ChordUtils.isInBetween(peerID, k, list[0].id));
-		if(ChordUtils.isInBetween(peerID, k, list[0].id) || peerID == list[0].id) {
-			return list[0];
-		}
-		for(int i = 0; i < list.length - 1; i++) {
-			//if(list[i].id + ((list[i].id<peerID)?(int)Math.pow(2, 16):0) <= k && k < list[i+1].id + ((list[i+1].id<peerID)?(int)Math.pow(2, 16):0)) {
-			System.out.println(i + " | " + "ChorUtils.isInBetween(" +list[i].id+ "," + k + ","+ list[i+1].id + ")" + " = "+ ChordUtils.isInBetween(list[i].id, k, list[i+1].id));
-			if(list[i].id == k || ChordUtils.isInBetween(list[i].id, k, list[i+1].id)) {
-				return list[i];
-			}
-		}
-		return list[list.length - 1];
-	}
-	
+	/** 
+	 * A presentable string for the Finger Table
+	 */
 	@Override
 	public synchronized String toString() {
 		String  s= "Finger Table\n===================\n";

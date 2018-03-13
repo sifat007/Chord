@@ -1,6 +1,12 @@
 import java.io.*;
 import java.net.*;
 
+/**
+ * Some utility functions
+ * 
+ * @author Tarequl Islam Sifat
+ *
+ */
 public class ChordUtils {
 	/**
 	 * This method converts a set of bytes into a Hexadecimal representation.
@@ -86,6 +92,13 @@ public class ChordUtils {
 	}
 	
 	
+	/**
+	 * Reads a string from the socket and returns the string
+	 * 
+	 * @param sock 
+	 * @return string read from the socket
+	 * @throws IOException
+	 */
 	public static String readStringFromSocket(Socket sock) throws IOException {
 		ObjectInputStream OIS = new ObjectInputStream(sock.getInputStream());
 		try {
@@ -96,25 +109,48 @@ public class ChordUtils {
 		}
 	}
 	
+	/**
+	 * Reads an object from the socket and returns the object
+	 * 
+	 * @param sock
+	 * @return object read from the socket
+	 * @throws IOException
+	 * @throws ClassNotFoundException
+	 */
 	public static Object readObjectFromSocket(Socket sock) throws IOException, ClassNotFoundException {
 		ObjectInputStream OIS = new ObjectInputStream(sock.getInputStream());
 		return OIS.readObject();
 	}
 	
+	/**
+	 * Writes a string into the socket
+	 * 
+	 * @param sock
+	 * @param message The string to be written into the socket
+	 * @throws IOException
+	 */
 	public static void writeStringToSocket(Socket sock, String message) throws IOException {
 		ObjectOutputStream OOS = new ObjectOutputStream(sock.getOutputStream());
 		OOS.writeObject(new String(message));
 	}
 	
+	/**
+	 * Writes an object into the socket
+	 * 
+	 * @param sock
+	 * @param obj The object to be written into the socket
+	 * @throws IOException
+	 */
 	public static void writeObjectToSocket(Socket sock, Object obj) throws IOException {
 		ObjectOutputStream OOS = new ObjectOutputStream(sock.getOutputStream());
 		OOS.writeObject(obj);
 	}
 	
 	/**
-	 * Reads a file from socket, saves in the /tmp directory, returns the filename
-	 * @param sock
-	 * @return filename
+	 * Reads a file(byte array) from socket, saves in the /tmp directory, returns the filename
+	 * 
+	 * @param sock 
+	 * @return filename The filename in the /tmp/ directory
 	 * @throws IOException
 	 * @throws ClassNotFoundException
 	 */
@@ -122,15 +158,13 @@ public class ChordUtils {
 	public static String readFileFromSocket(Socket sock) throws IOException, ClassNotFoundException{
 		ObjectInputStream ois = new ObjectInputStream(sock.getInputStream());
 		String filename = (String)ois.readObject();
-		//filename = "somefile.jpg";
 		File file = new File("/tmp/"+filename);
 		FileOutputStream fos = new FileOutputStream(file);
 		BufferedOutputStream bos = new BufferedOutputStream(fos);
 		
 		int buff_size = 10000;
 		byte[] contents;
-		System.out.println("Here");
-		//System.out.println(ois.readLong());		
+		System.out.println("Here");	
 		long filesize = ois.readLong();
 		System.out.println(filesize);
 		long iterations = filesize/buff_size + ((filesize%buff_size>0)?1:0);
@@ -144,6 +178,13 @@ public class ChordUtils {
 		return filename;
 	}
 	
+	/**
+	 * Write a file(after converting into byte array) into socket
+	 * 
+	 * @param sock
+	 * @param filePath The filename to be written into the socket
+	 * @throws IOException
+	 */
 	public static void writeFileToSocket(Socket sock, String filePath) throws IOException{
 		File file = new File(filePath);
 		FileInputStream fis = new FileInputStream(file);
@@ -170,6 +211,14 @@ public class ChordUtils {
         bis.close();
 	}
 
+	/**
+	 * Check if k is in between two peer ids, when the peer ids are indices of a circular array
+	 * 
+	 * @param prev
+	 * @param k
+	 * @param peerID
+	 * @return
+	 */
 	public static boolean isInBetween(int prev, int k, int peerID) {
 		if(prev == peerID) return false;
 		else if( (prev < peerID) && (prev <  k && k < peerID )  ) return true;
